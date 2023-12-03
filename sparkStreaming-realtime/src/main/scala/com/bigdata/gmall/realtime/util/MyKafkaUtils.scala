@@ -3,6 +3,7 @@ package com.bigdata.gmall.realtime.util
 import org.apache.kafka.clients.consumer
 import org.apache.kafka.clients.consumer.{ConsumerConfig, ConsumerRecord}
 import org.apache.kafka.clients.producer.{KafkaProducer, ProducerConfig, ProducerRecord}
+import org.apache.kafka.common.TopicPartition
 import org.apache.spark.streaming.StreamingContext
 import org.apache.spark.streaming.dstream.InputDStream
 import org.apache.spark.streaming.kafka010.{ConsumerStrategies, KafkaUtils, LocationStrategies}
@@ -43,6 +44,18 @@ object MyKafkaUtils {
     val kafkaDStream: InputDStream[ConsumerRecord[String, String]] = KafkaUtils.createDirectStream(ssc,
       LocationStrategies.PreferConsistent,
       ConsumerStrategies.Subscribe[String, String](Array(topic), consumerConfigs))
+    kafkaDStream
+  }
+
+  /**
+   * Consuming data based on Spark Streaming, obtaining a Kafka DStream, Using a specified offset
+   */
+  def getKafkaDStream(ssc: StreamingContext, topic: String, groupId: String, offsets: Map[TopicPartition, Long]) = {
+    consumerConfigs.put(ConsumerConfig.GROUP_ID_CONFIG, groupId)
+
+    val kafkaDStream: InputDStream[ConsumerRecord[String, String]] = KafkaUtils.createDirectStream(ssc,
+      LocationStrategies.PreferConsistent,
+      ConsumerStrategies.Subscribe[String, String](Array(topic), consumerConfigs, offsets))
     kafkaDStream
   }
 

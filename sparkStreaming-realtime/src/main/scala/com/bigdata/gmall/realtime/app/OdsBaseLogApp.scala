@@ -3,10 +3,12 @@ package com.bigdata.gmall.realtime.app
 import com.alibaba.fastjson.serializer.SerializeConfig
 import com.alibaba.fastjson.{JSON, JSONArray, JSONObject}
 import com.bigdata.gmall.realtime.bean.{PageActionLog, PageDisplayLog, PageLog, StartLog}
-import com.bigdata.gmall.realtime.util.MyKafkaUtils
+import com.bigdata.gmall.realtime.util.{MyKafkaUtils, MyOffsetsUtils}
 import org.apache.kafka.clients.consumer.ConsumerRecord
+import org.apache.kafka.common.TopicPartition
 import org.apache.spark.SparkConf
 import org.apache.spark.streaming.dstream.{DStream, InputDStream}
+import org.apache.spark.streaming.kafka010.{HasOffsetRanges, OffsetRange}
 import org.apache.spark.streaming.{Seconds, StreamingContext}
 
 import java.lang
@@ -35,11 +37,32 @@ object OdsBaseLogApp {
     // 2. Consume data from Kafka
     val topicName : String = "ODS_BASE_LOG_1018" // Corresponding to the topic name in the generator configuration
     val groupId : String = "ODS_BASE_LOG_GROUP_1018"
-    val kafkaDStream: InputDStream[ConsumerRecord[String, String]] = MyKafkaUtils.getKafkaDStream(ssc, topicName, groupId)
+
+    // Consuming with a specified offset from Redis
+    val offsets: Map[TopicPartition, Long] = MyOffsetsUtils.readOffset(topicName, groupId)
+
+    var kafkaDStream: InputDStream[ConsumerRecord[String, String]] = null
+    if(offsets != null && offsets.nonEmpty){
+      // Consuming with a specified offset
+      kafkaDStream = MyKafkaUtils.getKafkaDStream(ssc, topicName, groupId, offsets)
+    }else{
+      // Consuming with the default offset
+      kafkaDStream = MyKafkaUtils.getKafkaDStream(ssc, topicName, groupId)
+    }
+
+
+    // Extracting offsets from the currently consumed data without processing the data in the stream
+    var offsetRanges: Array[OffsetRange] = null
+    val offsetRangesDStream: DStream[ConsumerRecord[String, String]] = kafkaDStream.transform(
+      rdd => {
+        offsetRanges = rdd.asInstanceOf[HasOffsetRanges].offsetRanges // Executed on the driver side
+        rdd
+      }
+    )
 
     // 3. Process data
     // 3.1. Data structure transformation
-    val jsonObjDStream: DStream[JSONObject] = kafkaDStream.map(
+    val jsonObjDStream: DStream[JSONObject] = offsetRangesDStream.map(
       consumerRecord => {
         // Retrieve the 'value' from the ConsumerRecord; the 'value' is the log data
         val log: String = consumerRecord.value()
@@ -176,6 +199,8 @@ object OdsBaseLogApp {
             }
           }
         )
+        // Inside foreachRDD, outside foreach: Committing offsets -> Executed on the driver side, once per batch (periodically)
+        MyOffsetsUtils.saveOffset(topicName, groupId, offsetRanges)
       }
     )
 
