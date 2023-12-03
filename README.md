@@ -5,5 +5,8 @@ This is a Spark Streaming real-time data processing project based on e-commerce 
 ## Project Architecture
 ### 1. Overall Architecture
 ### 2. Log data collection and Streaming
+
+![Architecture ODS to DWD](project_Spark_Streaming/ODS_to_DWD.png)
+
 ### 3. Business Data Collection and Streaming
 ### 4. Data Processing from DWD to DWS Layer
