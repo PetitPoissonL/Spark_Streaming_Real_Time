@@ -108,4 +108,12 @@ object MyKafkaUtils {
   def close():Unit = {
     if(producer != null) producer.close()
   }
+
+  /**
+   * Flush: Writing data from the buffer to disk
+   */
+  def flush(): Unit = {
+    producer.flush()
+  }
+
 }

@@ -98,108 +98,115 @@ object OdsBaseLogApp {
     //  Startup data: Send to the corresponding topic
     jsonObjDStream.foreachRDD(
       rdd => {
-        rdd.foreach(
-          jsonObj => {
-            // Sharding process
-            // Sharding error data
-            val errObj: JSONObject = jsonObj.getJSONObject("err")
-            if(errObj != null){
-              // Send error data to the topic DWD_ERROR_LOG_TOPIC
-              MyKafkaUtils.send(DWD_ERROR_LOG_TOPIC, jsonObj.toJSONString)
-            }else{
-              // Extract common fields
-              val commonObj: JSONObject = jsonObj.getJSONObject("common")
-              val ar: String = commonObj.getString("ar")
-              val uid: String = commonObj.getString("uid")
-              val os: String = commonObj.getString("os")
-              val ch: String = commonObj.getString("ch")
-              val isNew: String = commonObj.getString("is_new")
-              val md: String = commonObj.getString("md")
-              val mid: String = commonObj.getString("mid")
-              val vc: String = commonObj.getString("vc")
-              val ba: String = commonObj.getString("ba")
+        rdd.foreachPartition(
+          jsonObjIter => {
+            for (jsonObj <- jsonObjIter) {
+              // Sharding process
+              // Sharding error data
+              val errObj: JSONObject = jsonObj.getJSONObject("err")
+              if (errObj != null) {
+                // Send error data to the topic DWD_ERROR_LOG_TOPIC
+                MyKafkaUtils.send(DWD_ERROR_LOG_TOPIC, jsonObj.toJSONString)
+              } else {
+                // Extract common fields
+                val commonObj: JSONObject = jsonObj.getJSONObject("common")
+                val ar: String = commonObj.getString("ar")
+                val uid: String = commonObj.getString("uid")
+                val os: String = commonObj.getString("os")
+                val ch: String = commonObj.getString("ch")
+                val isNew: String = commonObj.getString("is_new")
+                val md: String = commonObj.getString("md")
+                val mid: String = commonObj.getString("mid")
+                val vc: String = commonObj.getString("vc")
+                val ba: String = commonObj.getString("ba")
 
-              // Extract timestamp
-              val ts: Long = jsonObj.getLong("ts")
+                // Extract timestamp
+                val ts: Long = jsonObj.getLong("ts")
 
-              // page visit data
-              val pageObj: JSONObject = jsonObj.getJSONObject("page")
-              if(pageObj != null){
-                // Extract page data
-                val pageId: String = pageObj.getString("page_id")
-                val pageItem: String = pageObj.getString("item")
-                val pageItemType: String = pageObj.getString("item_type")
-                val duringTime: Long = pageObj.getLong("during_time")
-                val lastPageId: String = pageObj.getString("last_page_id")
-                val sourceType: String = pageObj.getString("source_type")
+                // page visit data
+                val pageObj: JSONObject = jsonObj.getJSONObject("page")
+                if (pageObj != null) {
+                  // Extract page data
+                  val pageId: String = pageObj.getString("page_id")
+                  val pageItem: String = pageObj.getString("item")
+                  val pageItemType: String = pageObj.getString("item_type")
+                  val duringTime: Long = pageObj.getLong("during_time")
+                  val lastPageId: String = pageObj.getString("last_page_id")
+                  val sourceType: String = pageObj.getString("source_type")
 
-                // Encapsulate as PageLog
-                var pageLog: PageLog = PageLog(mid,uid,ar,ch,isNew,md,os,vc,ba,pageId,lastPageId,pageItem,pageItemType,duringTime,sourceType,ts)
+                  // Encapsulate as PageLog
+                  var pageLog: PageLog = PageLog(mid, uid, ar, ch, isNew, md, os, vc, ba, pageId, lastPageId, pageItem, pageItemType, duringTime, sourceType, ts)
 
-                // Send to the topic DWD_PAGE_LOG_TOPIC
-                // pageLog is a Scala object without get and set methods, so we need SerializeConfig to retrieve data from its fields
-                MyKafkaUtils.send(DWD_PAGE_LOG_TOPIC, JSON.toJSONString(pageLog, new SerializeConfig(true)))
+                  // Send to the topic DWD_PAGE_LOG_TOPIC
+                  // pageLog is a Scala object without get and set methods, so we need SerializeConfig to retrieve data from its fields
+                  MyKafkaUtils.send(DWD_PAGE_LOG_TOPIC, JSON.toJSONString(pageLog, new SerializeConfig(true)))
 
-                // Extract exposure data
-                val displaysJsonArr: JSONArray = jsonObj.getJSONArray("displays")
-                if(displaysJsonArr != null && displaysJsonArr.size() > 0){
-                  for(i <- 0 until displaysJsonArr.size()){
-                    // To iterate and retrieve each exposure data
-                    val displayObj: JSONObject = displaysJsonArr.getJSONObject(i)
-                    // Extract exposure fields
-                    val displayType: String = displayObj.getString("display_type")
-                    val displayItem: String = displayObj.getString("item")
-                    val displayItemType: String = displayObj.getString("item_type")
-                    val posId: String = displayObj.getString("pos_id")
-                    val order: String = displayObj.getString("order")
+                  // Extract exposure data
+                  val displaysJsonArr: JSONArray = jsonObj.getJSONArray("displays")
+                  if (displaysJsonArr != null && displaysJsonArr.size() > 0) {
+                    for (i <- 0 until displaysJsonArr.size()) {
+                      // To iterate and retrieve each exposure data
+                      val displayObj: JSONObject = displaysJsonArr.getJSONObject(i)
+                      // Extract exposure fields
+                      val displayType: String = displayObj.getString("display_type")
+                      val displayItem: String = displayObj.getString("item")
+                      val displayItemType: String = displayObj.getString("item_type")
+                      val posId: String = displayObj.getString("pos_id")
+                      val order: String = displayObj.getString("order")
 
-                    // Encapsulate as PageDisplayLog
-                    val pageDisplayLog: PageDisplayLog = PageDisplayLog(mid,uid,ar,ch,isNew,md,os,vc,ba,pageId,lastPageId,pageItem,pageItemType,duringTime,sourceType,displayType,displayItem,displayItemType,order,posId,ts)
+                      // Encapsulate as PageDisplayLog
+                      val pageDisplayLog: PageDisplayLog = PageDisplayLog(mid, uid, ar, ch, isNew, md, os, vc, ba, pageId, lastPageId, pageItem, pageItemType, duringTime, sourceType, displayType, displayItem, displayItemType, order, posId, ts)
 
-                    // Send to the topic DWD_PAGE_DISPLAY_TOPIC
-                    MyKafkaUtils.send(DWD_PAGE_DISPLAY_TOPIC, JSON.toJSONString(pageDisplayLog, new SerializeConfig(true)))
+                      // Send to the topic DWD_PAGE_DISPLAY_TOPIC
+                      MyKafkaUtils.send(DWD_PAGE_DISPLAY_TOPIC, JSON.toJSONString(pageDisplayLog, new SerializeConfig(true)))
+                    }
+                  }
+
+                  // Extract event data
+                  val actionsJsonArr: JSONArray = jsonObj.getJSONArray("actions")
+                  if (actionsJsonArr != null && actionsJsonArr.size() > 0) {
+                    for (i <- 0 until actionsJsonArr.size()) {
+                      val actionObj: JSONObject = actionsJsonArr.getJSONObject(i)
+                      // Extract event fields
+                      val actionId: String = actionObj.getString("action_id")
+                      val actionItem: String = actionObj.getString("item")
+                      val actionItemType: String = actionObj.getString("item_type")
+                      val actionTs: Long = actionObj.getLong("ts")
+
+                      // Encapsulate as PageActionLog
+                      val pageActionLog: PageActionLog = PageActionLog(mid, uid, ar, ch, isNew, md, os, vc, ba, pageId, lastPageId, pageItem, pageItemType, duringTime, sourceType, actionId, actionItem, actionItemType, actionTs, ts)
+
+                      // Send to the topic DWD_PAGE_ACTION_TOPIC
+                      MyKafkaUtils.send(DWD_PAGE_ACTION_TOPIC, JSON.toJSONString(pageActionLog, new SerializeConfig(true)))
+                    }
                   }
                 }
 
-                // Extract event data
-                val actionsJsonArr: JSONArray = jsonObj.getJSONArray("actions")
-                if(actionsJsonArr != null && actionsJsonArr.size() > 0){
-                  for(i <- 0 until actionsJsonArr.size()){
-                    val actionObj: JSONObject = actionsJsonArr.getJSONObject(i)
-                    // Extract event fields
-                    val actionId: String = actionObj.getString("action_id")
-                    val actionItem: String = actionObj.getString("item")
-                    val actionItemType: String = actionObj.getString("item_type")
-                    val actionTs: Long = actionObj.getLong("ts")
+                // startup data
+                val startObj: JSONObject = jsonObj.getJSONObject("start")
+                if (startObj != null) {
+                  val entry: String = startObj.getString("entry")
+                  val loadingTime: Long = startObj.getLong("loading_time")
+                  val openAdId: String = startObj.getString("open_ad_id")
+                  val openAdMs: Long = startObj.getLong("open_ad_ms")
+                  val openAdSkipMs: Long = startObj.getLong("open_ad_skip_ms")
 
-                    // Encapsulate as PageActionLog
-                    val pageActionLog: PageActionLog = PageActionLog(mid,uid,ar,ch,isNew,md,os,vc,ba,pageId,lastPageId,pageItem,pageItemType,duringTime,sourceType,actionId,actionItem,actionItemType,actionTs,ts)
+                  // Encapsulate as StartLog
+                  val startLog: StartLog = StartLog(mid, ba, uid, ar, ch, isNew, md, os, vc, entry, openAdId, loadingTime, openAdMs, openAdSkipMs, ts)
 
-                    // Send to the topic DWD_PAGE_ACTION_TOPIC
-                    MyKafkaUtils.send(DWD_PAGE_ACTION_TOPIC, JSON.toJSONString(pageActionLog, new SerializeConfig(true)))
-                  }
+                  // Send to the topic DWD_START_LOG_TOPIC
+                  MyKafkaUtils.send(DWD_START_LOG_TOPIC, JSON.toJSONString(startLog, new SerializeConfig(true)))
                 }
-              }
-
-              // startup data
-              val startObj: JSONObject = jsonObj.getJSONObject("start")
-              if(startObj != null){
-                val entry: String = startObj.getString("entry")
-                val loadingTime: Long = startObj.getLong("loading_time")
-                val openAdId: String = startObj.getString("open_ad_id")
-                val openAdMs: Long = startObj.getLong("open_ad_ms")
-                val openAdSkipMs: Long = startObj.getLong("open_ad_skip_ms")
-
-                // Encapsulate as StartLog
-                val startLog: StartLog = StartLog(mid,ba,uid,ar,ch,isNew,md,os,vc,entry,openAdId,loadingTime,openAdMs,openAdSkipMs,ts)
-
-                // Send to the topic DWD_START_LOG_TOPIC
-                MyKafkaUtils.send(DWD_START_LOG_TOPIC, JSON.toJSONString(startLog, new SerializeConfig(true)))
               }
             }
+            // Inside foreachPartition: Executed on the executor side, once per partition per batch
+            // Flush Kafka
+            MyKafkaUtils.flush()
           }
         )
-        // Inside foreachRDD, outside foreach: Committing offsets -> Executed on the driver side, once per batch (periodically)
+
+        // Inside foreachRDD, outside foreachPartition: Executed on the driver side, once per batch (periodically)
+        // Committing offsets
         MyOffsetsUtils.saveOffset(topicName, groupId, offsetRanges)
       }
     )
