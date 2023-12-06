@@ -5,10 +5,13 @@ import com.bigdata.gmall.realtime.util.{MyKafkaUtils, MyOffsetsUtils, MyRedisUti
 import org.apache.kafka.clients.consumer.ConsumerRecord
 import org.apache.kafka.common.TopicPartition
 import org.apache.spark.SparkConf
+import org.apache.spark.broadcast.Broadcast
 import org.apache.spark.streaming.dstream.{DStream, InputDStream}
 import org.apache.spark.streaming.kafka010.{HasOffsetRanges, OffsetRange}
 import org.apache.spark.streaming.{Seconds, StreamingContext}
 import redis.clients.jedis.Jedis
+
+import java.util
 
 /**
  * Business data consumption and sharding
@@ -65,14 +68,27 @@ object OdsBaseDbApp {
     //jsonObjDStream.print(100)
 
     // 5.2. Data Sharding
-    // TODO: How to dynamically configure the list of tables?
-    // List of fact tables
-    val factTables : Array[String] = Array[String]("order_info", "order_detail")
-    // List of dimension tables
-    val dimTables : Array[String] = Array[String]("user_info", "base_province")
-
     jsonObjDStream.foreachRDD(
       rdd => {
+        // Maintain the table list in Redis and dynamically retrieve the table list from Redis in real-time tasks
+        //  -> key: FACT:TABLES DIM:TABLES
+        //  -> value: Collection of table names
+        //  -> Write API: sadd
+        //  -> Read API: smembers
+        //  -> Expiry Status: Does not expire
+        val redisFactKeys: String = "FACT:TABLES"
+        val redisDimKeys: String = "DIM:TABLES"
+        val jedis: Jedis = MyRedisUtils.getJedisFromPoll()
+        // List of fact tables
+        val factTables: util.Set[String] = jedis.smembers(redisFactKeys)
+        // Make it a broadcast variable
+        val factTablesBC: Broadcast[util.Set[String]] = ssc.sparkContext.broadcast(factTables)
+        // List of dimension tables
+        val dimTables: util.Set[String] = jedis.smembers(redisDimKeys)
+        // Make it a broadcast variable
+        val dimTablesBC: Broadcast[util.Set[String]] = ssc.sparkContext.broadcast(dimTables)
+        jedis.close()
+
         rdd.foreachPartition(
           jsonObjIter => {
             // Open a Redis connection
@@ -94,14 +110,14 @@ object OdsBaseDbApp {
                 // Extract table name
                 val tableName: String = jsonObj.getString("table")
 
-                if(factTables.contains(tableName)){
+                if(factTablesBC.value.contains(tableName)){
                   // fact data
                   val data: String = jsonObj.getString("data")
                   val dwdTopicName : String = s"DWD_${tableName.toUpperCase}_$opValue"  //exp: DWD_ORDER_INFO_I
                   MyKafkaUtils.send(dwdTopicName, data)
                 }
 
-                if(dimTables.contains(tableName)){
+                if(dimTablesBC.value.contains(tableName)){
                   // dimension data
                   // How to store dimension data in Redis?
                   //  -> key: DIM:tableName:ID
