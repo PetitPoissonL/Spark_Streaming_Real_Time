@@ -26,7 +26,7 @@ object MyBeanUtils {
   /**
    * Copy the values of properties from 'srcObj' to the corresponding properties in 'destObj'
    */
-  def copyProperties(srcObj : AnyRef, destObj : AnyRef): Any = {
+  def copyProperties(srcObj : AnyRef, destObj : AnyRef): Unit = {
     if(srcObj == null || destObj == null){
       return
     }
