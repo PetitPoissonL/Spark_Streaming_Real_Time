@@ -1,6 +1,7 @@
 # Spark real-time project
+
 ## Introduction
-___
+
 This is a Spark Streaming real-time data processing project based on e-commerce data. 
 
 The main data sources in the project are user behavior data obtained from logs and order data obtained from MySQL. 
@@ -10,7 +11,7 @@ The project ultimately presents data such as daily active users, orders, and use
 The project primarily utilizes tools such as Maxwell, Kafka, Spark, Redis, Elasticsearch, etc., for data processing, analysis, and visualization. Finally, it uses Spring Boot to create data interfaces.
 
 ## Prerequisites
-___
+
 Before setting up the project, ensure that you meet the following prerequisites:
 
 - **Remote Servers**: The project requires three remote servers. These servers should be running on CentOS 7.5 operating system.
@@ -20,7 +21,7 @@ Before setting up the project, ensure that you meet the following prerequisites:
     - `hadoop103`
     - `hadoop104`
 
-- **[Zookeeper Installation]()**: Zookeeper needs to be installed and properly configured for distributed coordination on each server.
+- **[Zookeeper Installation](https://github.com/PetitPoissonL/Installation-and-configuration-of-ZooKeeper)**: Zookeeper needs to be installed and properly configured for distributed coordination on each server.
 
 - **[Kafka Installation]()**: Kafka should be installed on all three servers (`hadoop102`, `hadoop103`, `hadoop104`) to facilitate message queuing and streaming capabilities.
 
@@ -31,7 +32,7 @@ Before setting up the project, ensure that you meet the following prerequisites:
 Ensure all these components are correctly installed and configured before proceeding with the setup of the project.
 
 ## Project Architecture
-___
+
 ### 1. Overall Architecture
 
 ![Overall Architecture](https://github.com/PetitPoissonL/Project-Description-Image/blob/main/project_Spark_Streaming/Architecture_global.png)
@@ -46,3 +47,5 @@ ___
 
 
 ### 4. Data Processing from DWD to DWS Layer
+
+![Architecture DWD to DWS](https://github.com/PetitPoissonL/Project-Description-Image/blob/main/project_Spark_Streaming/DWD_to_DWS.png)

@@ -81,12 +81,14 @@ object OdsBaseDbApp {
         val jedis: Jedis = MyRedisUtils.getJedisFromPoll()
         // List of fact tables
         val factTables: util.Set[String] = jedis.smembers(redisFactKeys)
-        // Make it a broadcast variable
-        val factTablesBC: Broadcast[util.Set[String]] = ssc.sparkContext.broadcast(factTables)
+        println("factTables: " + factTables)
         // List of dimension tables
         val dimTables: util.Set[String] = jedis.smembers(redisDimKeys)
+        println("dimTables: " + dimTables)
         // Make it a broadcast variable
+        val factTablesBC: Broadcast[util.Set[String]] = ssc.sparkContext.broadcast(factTables)
         val dimTablesBC: Broadcast[util.Set[String]] = ssc.sparkContext.broadcast(dimTables)
+
         jedis.close()
 
         rdd.foreachPartition(
@@ -113,7 +115,7 @@ object OdsBaseDbApp {
                 if(factTablesBC.value.contains(tableName)){
                   // fact data
                   val data: String = jsonObj.getString("data")
-                  val dwdTopicName : String = s"DWD_${tableName.toUpperCase}_$opValue"  //exp: DWD_ORDER_INFO_I
+                  val dwdTopicName : String = s"DWD_${tableName.toUpperCase}_${opValue}_1018"  //exp: DWD_ORDER_INFO_I_1018
                   MyKafkaUtils.send(dwdTopicName, data)
                 }
 
@@ -134,7 +136,7 @@ object OdsBaseDbApp {
                   // The frequent opening and closing of Redis connections in this location
                   //val jedis: Jedis = MyRedisUtils.getJedisFromPoll()
                   jedis.set(redisKey, dataObj.toJSONString)
-                  // jedis.close()
+                  //jedis.close()
                 }
               }
             }
