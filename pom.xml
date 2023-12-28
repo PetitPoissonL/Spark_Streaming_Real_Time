@@ -10,6 +10,7 @@
     <packaging>pom</packaging>
     <modules>
         <module>sparkStreaming-realtime</module>
+        <module>es-demo</module>
     </modules>
 
     <properties>
