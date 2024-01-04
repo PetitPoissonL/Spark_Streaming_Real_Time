@@ -2,7 +2,7 @@ package com.bigdata.gmall.realtime.app
 
 import com.alibaba.fastjson.{JSON, JSONObject}
 import com.bigdata.gmall.realtime.bean.{DauInfo, PageLog}
-import com.bigdata.gmall.realtime.util.{MyBeanUtils, MyKafkaUtils, MyOffsetsUtils, MyRedisUtils}
+import com.bigdata.gmall.realtime.util.{MyBeanUtils, MyEsUtils, MyKafkaUtils, MyOffsetsUtils, MyRedisUtils}
 import org.apache.kafka.clients.consumer.ConsumerRecord
 import org.apache.kafka.common.TopicPartition
 import org.apache.spark.SparkConf
@@ -189,9 +189,35 @@ object DwdDauApp {
         dauInfos.iterator
       }
     )
-    dauInfoDStream.print(100)
+    //dauInfoDStream.print(100)
 
     // Writing into OLAP
+    // Splitting indices by date and controlling mappings, settings, aliases, etc., through an index template
+    dauInfoDStream.foreachRDD(
+      rdd => {
+        rdd.foreachPartition(
+          dauInfoIter => {
+            val docs: List[(String, DauInfo)] = dauInfoIter.map(dauInfo => (dauInfo.mid, dauInfo)).toList
+
+            if(docs.nonEmpty){
+              // index name
+              // If it's a production environment, you can directly obtain the current date
+              // Because we are simulating data, we will generate data for different days
+              // Get the date from the first data record
+              val head: (String, DauInfo) = docs.head
+              val ts: Long = head._2.ts
+              val sdf = new SimpleDateFormat("yyyy-MM-dd")
+              val dateStr: String = sdf.format(new Date(ts))
+              val indexName: String = s"gmall_dau_info_1018_$dateStr"
+              // write in ES
+              MyEsUtils.bulkSave(indexName, docs)
+            }
+          }
+        )
+        // commit offset
+        MyOffsetsUtils.saveOffset(topicName, groupId, offsetRanges)
+      }
+    )
 
     ssc.start()
     ssc.awaitTermination()
