@@ -70,7 +70,9 @@ object OdsBaseDbApp {
     // 5.2. Data Sharding
     jsonObjDStream.foreachRDD(
       rdd => {
+
         // Maintain the table list in Redis and dynamically retrieve the table list from Redis in real-time tasks
+        //  -> type: set
         //  -> key: FACT:TABLES DIM:TABLES
         //  -> value: Collection of table names
         //  -> Write API: sadd
@@ -81,10 +83,12 @@ object OdsBaseDbApp {
         val jedis: Jedis = MyRedisUtils.getJedisFromPoll()
         // List of fact tables
         val factTables: util.Set[String] = jedis.smembers(redisFactKeys)
-        println("factTables: " + factTables)
+        //val factTables: Array[String] = Array[String]("order_info", "order_detail")
+        //println("factTables: " + factTables)
         // List of dimension tables
         val dimTables: util.Set[String] = jedis.smembers(redisDimKeys)
-        println("dimTables: " + dimTables)
+        //val dimTables: Array[String] = Array[String]("user_info", "base_province")
+        //println("dimTables: " + dimTables)
         // Make it a broadcast variable
         val factTablesBC: Broadcast[util.Set[String]] = ssc.sparkContext.broadcast(factTables)
         val dimTablesBC: Broadcast[util.Set[String]] = ssc.sparkContext.broadcast(dimTables)
