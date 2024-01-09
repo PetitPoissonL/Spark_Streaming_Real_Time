@@ -238,7 +238,7 @@ object DwdOrderApp {
       rdd => {
         rdd.foreachPartition(
           orderWideIter => {
-            val orderWides: List[(String, OrderWide)] = orderWideIter.map(orderWide => (orderWide.detail_id, orderWide)).toList
+            val orderWides: List[(String, OrderWide)] = orderWideIter.map(orderWide => (orderWide.detail_id.toString, orderWide)).toList
             if(orderWides.nonEmpty){
               val head: (String, OrderWide) = orderWides.head
               val date: String = head._2.create_date
