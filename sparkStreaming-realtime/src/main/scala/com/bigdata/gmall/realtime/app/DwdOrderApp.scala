@@ -3,7 +3,7 @@ package com.bigdata.gmall.realtime.app
 import com.alibaba.fastjson.serializer.SerializeConfig
 import com.alibaba.fastjson.{JSON, JSONObject}
 import com.bigdata.gmall.realtime.bean.{OrderDetail, OrderInfo, OrderWide}
-import com.bigdata.gmall.realtime.util.{MyKafkaUtils, MyOffsetsUtils, MyRedisUtils}
+import com.bigdata.gmall.realtime.util.{MyEsUtils, MyKafkaUtils, MyOffsetsUtils, MyRedisUtils}
 import org.apache.kafka.clients.consumer.ConsumerRecord
 import org.apache.kafka.common.TopicPartition
 import org.apache.spark.SparkConf
@@ -230,8 +230,30 @@ object DwdOrderApp {
         orderWides.iterator
       }
     )
-    orderWideDStream.print(100)
+    //orderWideDStream.print(100)
 
+    // 2. Using the utility class to write data into Elasticsearch
+    // Splitting indices
+    orderWideDStream.foreachRDD(
+      rdd => {
+        rdd.foreachPartition(
+          orderWideIter => {
+            val orderWides: List[(String, OrderWide)] = orderWideIter.map(orderWide => (orderWide.detail_id, orderWide)).toList
+            if(orderWides.nonEmpty){
+              val head: (String, OrderWide) = orderWides.head
+              val date: String = head._2.create_date
+              // name of index
+              val indexName: String = s"gmall_order_wide_1018_$date"
+              // write in ES
+              MyEsUtils.bulkSave(indexName, orderWides)
+            }
+          }
+        )
+        // commit offset *2
+        MyOffsetsUtils.saveOffset(orderInfoTopicName, orderInfoGroup, orderInfoOffsetRanges)
+        MyOffsetsUtils.saveOffset(orderDetailTopicName, orderDetailGroup, orderDetailOffsetRanges)
+      }
+    )
 
     ssc.start()
     ssc.awaitTermination()
