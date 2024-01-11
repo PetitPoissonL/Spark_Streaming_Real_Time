@@ -9,7 +9,7 @@ import org.apache.spark.SparkConf
 import org.apache.spark.streaming.dstream.{DStream, InputDStream}
 import org.apache.spark.streaming.kafka010.{HasOffsetRanges, OffsetRange}
 import org.apache.spark.streaming.{Seconds, StreamingContext}
-import redis.clients.jedis.Jedis
+import redis.clients.jedis.{Jedis, Pipeline}
 
 import java.text.SimpleDateFormat
 import java.time.{LocalDate, Period}
@@ -33,6 +33,9 @@ import scala.collection.mutable.ListBuffer
  */
 object DwdDauApp {
   def main(args: Array[String]): Unit = {
+    // 0. State restoration
+    revertState()
+
     // 1.Preparing Real-time Processing Environment: StreamingContext
     val sparkConf: SparkConf = new SparkConf().setAppName("dwd_dau_app").setMaster("local[4]")
     val ssc = new StreamingContext(sparkConf, Seconds(5))
@@ -222,4 +225,35 @@ object DwdDauApp {
     ssc.start()
     ssc.awaitTermination()
   }
+
+  /**
+   * State restoration
+   *
+   * Perform a state restoration each time the real-time task starts.
+   * Based on Elasticsearch, extract all mid and overwrite them into Redis
+   */
+
+  def revertState(): Unit = {
+    // Query all mids from Elasticsearch
+    val date: LocalDate = LocalDate.now()
+    val indexName: String = s"gmall_dau_info_1018_$date"
+    val fieldName: String = "mid"
+    val mids: List[String] = MyEsUtils.searchField(indexName, fieldName)
+
+    // Delete the state records (all mids) stored in Redis
+    val jedis: Jedis = MyRedisUtils.getJedisFromPoll()
+    val redisDauKey: String = s"DAU:$date"
+    jedis.del(redisDauKey)
+
+    // Overwrite the mids retrieved from Elasticsearch into Redis
+    if(mids != null && mids.nonEmpty){
+      val pipeline: Pipeline = jedis.pipelined()
+      for (mid <- mids) {
+        pipeline.sadd(redisDauKey, mid) // Do not execute directly in Redis
+      }
+      pipeline.sync() // Execute it in Redis
+    }
+    jedis.close()
+  }
+
 }
